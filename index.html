@@ -32,11 +32,11 @@
 
 		<br>
 
-		Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
+		Link to webpage: <a href="https://cal-cs184-student.github.io/hw2-lol-writeup/">cal-cs184-student.github.io/hw2-lol-writeup</a>
 
 		<br>
 		
-		Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/fa26">cs184.eecs.berkeley.edu/fa26</a>
+		Link to GitHub repository: <a href="https://github.com/cal-cs184-student/hw2-lol">github.com/cal-cs184-student/hw2-lol</a>
 
 		<figure>
 			<img src="assets/teapot.png" alt="Teapot" style="width:50%"/>
@@ -53,29 +53,56 @@
 		<h2>Section I: Bezier Curves and Surfaces</h2>
 
 		<h3>Part 1: Bezier curves with 1D de Casteljau subdivision</h3>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>
+		A Bezier curve of degree \(n\) is defined by \(n+1\) control points \(p_0, \dots, p_n\). De Casteljau's algorithm evaluates the curve at a parameter \(t \in [0, 1]\) using nothing but repeated linear interpolation. Given the points at one level, each pair of neighbors is blended into a single new point:
+		\[ p_i' = (1 - t)\,p_i + t\,p_{i+1}, \qquad i = 0, \dots, n-1. \]
+		This turns \(n+1\) points into \(n\) points. Applying the same step to the new points again and again shrinks the set by one each time, until a single point is left. That last point is exactly \(B(t)\), the point on the curve at parameter \(t\). Sweeping \(t\) from 0 to 1 traces out the whole curve.
+		</p>
+		<p>
+		I implemented this in <code>BezierCurve::evaluateStep</code>, which performs exactly <i>one</i> level of the recursion. It loops over each adjacent pair of input points, computes \((1 - t)\,p_i + t\,p_{i+1}\) using the curve's member parameter <code>t</code>, and pushes the result into a new vector, which it returns (so \(n\) inputs give \(n-1\) outputs). The GUI calls this function repeatedly to display each intermediate level, and the full curve is drawn by running it until one point remains for many values of \(t\).
+		</p>
 
-		<p>Here is an example 2x2 gridlike structure using an HTML table. Each <b>tr</b> is a row and each <b>td</b> is a column in that row. You might find this useful for framing and showing your result images in an organized fashion.</p>
+		<p>I created my own curve with 6 control points (<code>bzc/curve6.bzc</code>). Below are the levels of de Casteljau's algorithm at the same \(t\), from the original control points down to the final evaluated point, followed by the complete curve.</p>
 		<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
 				<td style="text-align: center;">
-				  <img src="assets/teapot.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/part1/level0.png" width="400px"/>
+				  <figcaption>Level 0: the 6 original control points</figcaption>
 				</td>
 				<td style="text-align: center;">
-				  <img src="assets/teapot.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/part1/level1.png" width="400px"/>
+				  <figcaption>Level 1: 5 intermediate points</figcaption>
 				</td>
 			  </tr>
 			  <tr>
 				<td style="text-align: center;">
-				  <img src="assets/teapot.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/part1/level2.png" width="400px"/>
+				  <figcaption>Level 2: 4 intermediate points</figcaption>
 				</td>
 				<td style="text-align: center;">
-				  <img src="assets/teapot.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/part1/level3.png" width="400px"/>
+				  <figcaption>Level 3: 3 intermediate points</figcaption>
+				</td>
+			  </tr>
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part1/level4.png" width="400px"/>
+				  <figcaption>Level 4: 2 intermediate points</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part1/level5.png" width="400px"/>
+				  <figcaption>Level 5: the final point on the curve (red)</figcaption>
+				</td>
+			  </tr>
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part1/full_curve.png" width="400px"/>
+				  <figcaption>The complete Bezier curve with all levels shown</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part1/modified_curve.png" width="400px"/>
+				  <figcaption>A different curve: control points moved and \(t\) changed with the scroll wheel</figcaption>
 				</td>
 			  </tr>
 			</table>
