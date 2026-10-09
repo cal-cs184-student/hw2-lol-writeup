@@ -18,10 +18,36 @@
 
 			img {
 				display: inline-block;
+				max-width: 100%;
+				height: auto;
+			}
+
+			table {
+				table-layout: fixed;
+			}
+
+			td {
+				width: 50%;
+				vertical-align: top;
 			}
 
 			body {
 				font-family: 'Inter', sans-serif;
+			}
+
+			/* Keep images inside the page and avoid awkward page breaks when printing to PDF. */
+			@media print {
+				.container {
+					padding: 0 4%;
+				}
+
+				h2, h3, h4 {
+					break-after: avoid;
+				}
+
+				tr, figure, img {
+					break-inside: avoid;
+				}
 			}
 		</style>
 	</head>
