@@ -125,10 +125,54 @@
 		<h2>Section II: Triangle Meshes and Half-Edge Data Structure</h2>
 
 		<h3>Part 3: Area-weighted vertex normals</h3>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>
+		With flat shading, every triangle uses its own face normal, so the lighting jumps abruptly at each edge and the mesh looks faceted. Phong shading instead interpolates normals stored at the vertices across each triangle, which requires a good normal at every vertex. A natural choice is the average of the normals of all faces touching the vertex, weighted by each face's area so that large faces have more influence than tiny slivers.
+		</p>
+		<p>
+		I implemented this in <code>Vertex::normal</code>. Starting from the vertex's halfedge, I walk around the vertex by repeatedly moving to <code>h-&gt;twin()-&gt;next()</code>, which visits each incident face exactly once, stopping when I get back to the starting halfedge. For each face that is not a virtual boundary face, I take its three vertices \(p_0, p_1, p_2\) in the face's winding order and compute \((p_1 - p_0) \times (p_2 - p_0)\). This cross product points along the face normal, and its length is twice the triangle's area, so simply adding these vectors together already gives an area-weighted sum (the constant factor of 2 does not matter). Finally, I normalize the sum to get a unit vector. Using the same winding order as the faces keeps all normals pointing outward. Because the function is <code>const</code>, the traversal uses <code>HalfedgeCIter</code>.
+		</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part3/teapot_flat.png" width="400px"/>
+				  <figcaption><code>dae/teapot.dae</code> with flat shading (face normals)</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part3/teapot_phong.png" width="400px"/>
+				  <figcaption><code>dae/teapot.dae</code> with Phong shading (area-weighted vertex normals)</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
 
 		<h3>Part 4: Edge flip</h3>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>
+		An edge flip takes two triangles that share an edge and swaps which diagonal of the resulting quadrilateral is used. If the triangles are \((v_0, v_1, v_2)\) and \((v_1, v_0, v_3)\), sharing the edge \(v_0 v_1\), then after the flip they become \((v_3, v_2, v_0)\) and \((v_2, v_3, v_1)\), sharing the new edge \(v_2 v_3\). The flip changes only connectivity: no vertex moves, and no element is created or deleted.
+		</p>
+		<p>
+		In <code>HalfedgeMesh::flipEdge</code>, I first return immediately if the edge is on the boundary, since a boundary edge has only one real triangle. Otherwise, I collect iterators to every element involved before changing anything: the 6 halfedges of the two triangles, the 4 outer twin halfedges around the quadrilateral, the 4 vertices, the 5 edges, and the 2 faces. Then I reassign the pointers of the 6 inner halfedges with <code>setNeighbors</code>, so each one gets its new <code>next</code>, <code>twin</code>, <code>vertex</code>, <code>edge</code> and <code>face</code>. The two halfedges of the flipped edge now start at \(v_3\) and \(v_2\), and each of the other four halfedges moves into whichever new triangle it now borders. Finally, I update the <code>halfedge()</code> pointer of all 4 vertices, the flipped edge, and both faces, because a vertex or face may have pointed to a halfedge that now belongs to a different triangle. The outer twins and the 4 outer edges do not need to change. The whole operation does a constant amount of work, independent of the mesh size.
+		</p>
+		<p>
+		Following the spec's advice, I reassigned every pointer of every affected element, even ones that happen to stay the same. This makes the code easier to check against a diagram: one line per element, with no reasoning about which pointers could be skipped.
+		</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/teapot_before_flip.png" width="400px"/>
+				  <figcaption>Teapot before any edge flips</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/teapot_after_flip.png" width="400px"/>
+				  <figcaption>After flipping several edges (visible as new shading discontinuities near the top of the body, on its right side, and on the spout)</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+		<p>
+		<b>Debugging.</b> To test the flip, I wrote a small checker that walks the whole mesh and verifies the half-edge invariants: every twin is symmetric, every face loop is a triangle, each halfedge's twin starts where its next starts, every vertex, edge and face points to a halfedge that points back to it, and walking around each vertex returns to the start. I ran it after flipping every edge of an icosahedron (and flipping back, which must restore the original mesh exactly) and after thousands of random flips on a grid with a boundary. One surprise: my checker initially failed on a freshly loaded mesh, before any flip. It turned out that the starter code never sets the <code>halfedge()</code> pointer of the virtual boundary faces, so I changed the checker to examine boundary loops through their halfedges instead.
+		</p>
 
 		<h3>Part 5: Edge split</h3>
 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
