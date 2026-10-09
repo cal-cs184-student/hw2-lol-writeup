@@ -161,11 +161,11 @@
 			  <tr>
 				<td style="text-align: center;">
 				  <img src="assets/part4/teapot_before_flip.png" width="400px"/>
-				  <figcaption>Teapot before any edge flips</figcaption>
+				  <figcaption>Close-up of the teapot body before any flips. The original mesh is made of thin quads, each split into two triangles along a consistent diagonal, which gives the regular striped shading.</figcaption>
 				</td>
 				<td style="text-align: center;">
 				  <img src="assets/part4/teapot_after_flip.png" width="400px"/>
-				  <figcaption>After flipping several edges (visible as new shading discontinuities near the top of the body, on its right side, and on the spout)</figcaption>
+				  <figcaption>The same view after flipping the diagonals of the quads in the central column and a few in the neighboring columns. Each flipped diagonal now runs the other way, so the two triangles of each quad are lit differently and appear as wedge-shaped stripes, while the surface stays closed with no holes.</figcaption>
 				</td>
 			  </tr>
 			</table>
@@ -175,7 +175,39 @@
 		</p>
 
 		<h3>Part 5: Edge split</h3>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>
+		An edge split inserts a new vertex \(m\) at the midpoint of an edge and connects it to the two vertices opposite that edge. If the edge \(v_0 v_1\) is shared by triangles \((v_0, v_1, v_2)\) and \((v_1, v_0, v_3)\), the split replaces these 2 triangles with 4: \((m, v_1, v_2)\), \((v_0, m, v_2)\), \((v_1, m, v_3)\) and \((m, v_0, v_3)\). Unlike a flip, a split adds elements: exactly 1 vertex, 3 edges, 6 halfedges and 2 faces.
+		</p>
+		<p>
+		In <code>HalfedgeMesh::splitEdge</code>, I skip boundary edges and return <code>verticesEnd()</code> to signal that no vertex was created. For an interior edge, I first collect iterators to all existing elements around the two triangles, using the same labeling as my edge flip. Then I allocate the new vertex, the 3 new edges (the second half of the split edge, plus the two edges from \(m\) to \(v_2\) and \(v_3\)), the 6 new halfedges, and the 2 new faces. I reuse the original edge as one half of the split edge and the two original faces as two of the four new triangles. Next, I set every pointer of all 12 halfedges inside the two original triangles with <code>setNeighbors</code>, and update the <code>halfedge()</code> pointer of the 5 vertices, the 4 inner edges and the 4 faces. One easy-to-miss detail is \(v_0\): its old halfedge may have been the halfedge along the split edge, which now starts at \(m\), so it must be reassigned. The new vertex is placed at \((v_0 + v_1)/2\), and its halfedge points along the original edge, as the starter code requires. Finally, I set the <code>isNew</code> flags that Loop subdivision needs: the new vertex is new, the two halves of the split edge are not new, and the two edges cutting across the original triangles are new.
+		</p>
+		<p>
+		Since the new vertex lies exactly on the old edge, a split does not change the shape of the surface, so the four new triangles have the same shading as the two triangles they replace. To make the splits visible, the screenshots below are taken in the viewer's mode that draws every mesh edge.
+		</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part5/split_before.png" width="400px"/>
+				  <figcaption>Close-up of the teapot before any operations</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part5/split_after.png" width="400px"/>
+				  <figcaption>After splitting many edges: each split adds a vertex at the edge's midpoint with new edges to the two opposite vertices, while the shading is unchanged (the magenta edge is just the edge under the cursor)</figcaption>
+				</td>
+			  </tr>
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part5/split_flip_after.png" width="400px"/>
+				  <figcaption>After a further mix of splits and flips: the flips change the triangles' orientation, visible as new shading on the left side and at the bottom</figcaption>
+				</td>
+				<td></td>
+			  </tr>
+			</table>
+		</div>
+		<p>
+		<b>Debugging.</b> I tested the split with the same half-edge checker I wrote for Part 4. Splitting all 30 edges of an icosahedron must produce exactly 42 vertices, 120 edges and 80 faces (the same counts as one round of 1-to-4 subdivision) with an unchanged total area. I also ran over a thousand random splits and flips on a grid with a boundary, checking every pointer invariant along the way, and confirmed that the Euler characteristic \(V - E + F\) stayed constant.
+		</p>
 
 		<h3>Part 6: Loop subdivision for mesh upsampling</h3>
 		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
