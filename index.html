@@ -28,7 +28,7 @@
 	<body>
 		<div class="container">
 		<h1>CS184/284A Fall 2026 Homework 2 Write-Up</h1>
-		<div style="text-align: center;">Names: </div>
+		<div style="text-align: center;">Name: Ziniu Zheng</div>
 
 		<br>
 
@@ -38,17 +38,20 @@
 		
 		Link to GitHub repository: <a href="https://github.com/cal-cs184-student/hw2-lol">github.com/cal-cs184-student/hw2-lol</a>
 
-		<figure>
-			<img src="assets/teapot.png" alt="Teapot" style="width:50%"/>
-			<figcaption>You can add images with captions!</figcaption>
-		</figure>
-
 		<!--
 		We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
 		-->
 
 		<h2>Overview</h2>
-		Give a high-level overview of what you implemented in this homework. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the homework.
+		<p>
+		In this homework I built the core tools of a small geometric modeling program, in two halves. In Section I, I implemented de Casteljau's algorithm: first for 2D Bezier curves, one level of linear interpolation at a time, and then for bicubic Bezier surfaces by applying the same 1D algorithm separably, first along the rows of the control grid and then across the results. This was enough to turn the control points of the Utah teapot into a rendered surface.
+		</p>
+		<p>
+		In Section II, I worked with triangle meshes stored in a half-edge data structure. I computed area-weighted vertex normals to get smooth Phong shading, implemented the two basic local operations, edge flip and edge split, and then combined them into Loop subdivision, which repeatedly splits every triangle into four and repositions the vertices to smooth the mesh.
+		</p>
+		<p>
+		The most interesting lesson for me was how much a mesh's connectivity, not just its geometry, determines the result. Loop subdivision on a perfectly symmetric cube produced a lopsided shape, purely because of which diagonal had been used to split each face. Re-splitting those diagonals to give every corner the same connectivity made the result symmetric again. I also learned that pointer-heavy code like the half-edge operations is far easier to get right with a disciplined process: drawing the before/after diagram, labeling every element, reassigning every pointer even when it does not change, and testing with an automated checker that verifies every half-edge invariant, rather than trusting that the mesh "looks right" in the viewer.
+		</p>
 
 		<h2>Section I: Bezier Curves and Surfaces</h2>
 
@@ -161,11 +164,11 @@
 			  <tr>
 				<td style="text-align: center;">
 				  <img src="assets/part4/teapot_before_flip.png" width="400px"/>
-				  <figcaption>Close-up of the teapot body before any flips. The original mesh is made of thin quads, each split into two triangles along a consistent diagonal, which gives the regular striped shading.</figcaption>
+				  <figcaption>Close-up of the teapot body before any flips, with mesh edges shown. The mesh is a grid of quads, each split into two triangles by a diagonal that runs the same way across the whole region.</figcaption>
 				</td>
 				<td style="text-align: center;">
 				  <img src="assets/part4/teapot_after_flip.png" width="400px"/>
-				  <figcaption>The same view after flipping the diagonals of the quads in the central column and a few in the neighboring columns. Each flipped diagonal now runs the other way, so the two triangles of each quad are lit differently and appear as wedge-shaped stripes, while the surface stays closed with no holes.</figcaption>
+				  <figcaption>The same view after a number of flips. Flipped quad diagonals now run the opposite way, creating the X- and fan-like patterns in the middle and on the right. I also flipped some horizontal and vertical edges (lower middle and left). Those two triangles belong to different quads, so the new edge crosses between them and forms long, thin triangles with darker shading. The surface stays closed with no holes.</figcaption>
 				</td>
 			  </tr>
 			</table>
@@ -210,21 +213,95 @@
 		</p>
 
 		<h3>Part 6: Loop subdivision for mesh upsampling</h3>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<p>
+		Loop subdivision turns a coarse triangle mesh into a smoother, denser one. Each round has two parts: a topological step that splits every triangle into 4, and a geometric step that moves every vertex to a weighted average of its neighbors. Repeating it converges to a smooth limit surface.
+		</p>
+		<p>
+		I implemented <code>MeshResampler::upsample</code> in five steps, computing all new positions on the original mesh first, so that every weighted average uses the original positions:
+		</p>
+		<ol>
+			<li><b>Old vertices.</b> For each vertex, I walk around it to sum its neighbors' positions and count its degree \(n\). Its new position is \((1 - n u)\,\text{original} + u \cdot \text{neighbor sum}\), with \(u = 3/16\) if \(n = 3\) and \(u = 3/(8n)\) otherwise. I store this in <code>Vertex::newPosition</code> and mark the vertex as old (<code>isNew = false</code>).</li>
+			<li><b>New (edge) vertices.</b> For each edge \(AB\) with opposite vertices \(C\) and \(D\), the vertex that will be inserted there gets the position \(\frac{3}{8}(A + B) + \frac{1}{8}(C + D)\), which I store in <code>Edge::newPosition</code>.</li>
+			<li><b>Split every original edge.</b> Splitting appends new edges to the end of the mesh's edge list, so I record the number of edges beforehand and split exactly that many, saving the next iterator before each split. I copy the edge's stored position into the new vertex's <code>newPosition</code>. My <code>splitEdge</code> already sets the flags: the new vertex is new, the two halves of the split edge are old, and the two edges cutting across the old triangles are new.</li>
+			<li><b>Flip.</b> I flip every new edge that connects an old vertex to a new vertex. This turns the 4 triangles around each original triangle into the standard 1-to-4 pattern, with the middle triangle formed by the three new vertices.</li>
+			<li><b>Update.</b> Finally, I copy <code>newPosition</code> into <code>position</code> for every vertex.</li>
+		</ol>
+		<p>
+		<b>Debugging.</b> To check correctness, I wrote a separate reference version of Loop subdivision that works directly on the list of triangles, without the half-edge structure. On a tetrahedron (degree 3, which exercises \(u = 3/16\)), an octahedron (degree 4), an icosahedron (degree 5 and then 6) and an irregular triangulated cube, I subdivided 2 to 3 times and checked that every vertex position, every triangle and every triangle's orientation matched the reference exactly, and that the half-edge structure stayed valid after each round.
+		</p>
 
-		<h2>(Optional) Section III: Potential Extra Credit - Art Competition: Model something Creative</h2>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+		<h4>Sharp corners and edges</h4>
+		<p>
+		Loop subdivision smooths everything: every vertex moves toward a weighted average of its neighbors, so sharp corners and edges get rounded off, and the whole shape shrinks. The cube below loses its corners after one round, and after three rounds it looks like a lumpy ball, noticeably smaller than the original cube.
+		</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part6/cube_0.png" width="400px"/>
+				  <figcaption><code>dae/cube.dae</code>, original</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part6/cube_1.png" width="400px"/>
+				  <figcaption>After 1 round of subdivision</figcaption>
+				</td>
+			  </tr>
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part6/cube_2.png" width="400px"/>
+				  <figcaption>After 2 rounds</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part6/cube_3.png" width="400px"/>
+				  <figcaption>After 3 rounds: rounded, shrunk, and visibly asymmetric</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+		<h4>Does pre-splitting edges help?</h4>
+		<p>
+		To test whether adding vertices near a feature keeps it sharper, I took a fresh cube and split each of the 3 cube edges meeting at the front corner three times, each time splitting the half closest to that corner, so the new vertices crowd toward the corner. Because each split also connects the new vertex to the two vertices opposite the edge, this creates fans of long, thin triangles converging on the top and right corners, which now have very high degree.
+		</p>
+		<p>
+		After two rounds of subdivision, the region where the vertices were concentrated does not round off like the rest: the small triangles there converge into a pinched, creased point instead of a smooth curve. That is the local effect we wanted. Since each vertex is averaged only with its nearby neighbors, packing vertices close to a feature limits how far the smoothing can spread. However, the overall result is much worse than plain subdivision. The long sliver triangles and the high-degree fan vertices pull the surface unevenly, producing dents and folds across the whole shape. So pre-splitting does reduce rounding near the feature, but only helps cleanly if the added vertices keep the triangles well shaped (for example, by also splitting the neighboring edges, or flipping to avoid slivers). Splitting a few edges on their own trades one artifact for another.
+		</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part6/presplit_0.png" width="400px"/>
+				  <figcaption>The 3 cube edges at the front corner, each split three times toward that corner</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part6/presplit_2.png" width="400px"/>
+				  <figcaption>After 2 rounds: a pinched, sharper feature where vertices were concentrated, but strong dents and folds caused by the thin, uneven triangles</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
 
-		<h2>Additional Notes (please remove)</h2>
-		<ul>
-			<li>You can also add code if you'd like as so: <code>code code code</code></li>
-			<li>If you'd like to add math equations, 
-				<ul>
-					<li>You can write inline equations like so: \( a^2 + b^2 = c^2 \)</li>
-					<li>You can write display equations like so: \[ a^2 + b^2 = c^2 \]</li>
-				</ul>
-			</li>
-		</ul>
+		<h4>Why the cube becomes asymmetric, and how to fix it</h4>
+		<p>
+		The cube is geometrically symmetric, but its triangulation is not. Each square face is cut into two triangles by a single diagonal, and the diagonals do not follow a symmetric pattern, so different corners touch different numbers of edges. Counting the edges at each of the 8 corners of <code>cube.dae</code> gives degrees 3, 4, 4, 4, 5, 5, 5 and 6. Loop subdivision's weights depend on a vertex's degree and on which vertices are its neighbors. Corners with more neighbors are pulled toward more points, and each diagonal pulls the surface toward the two corners it connects. So the same rule moves the 8 corners differently, and the subdivided shape inherits the asymmetry of the triangulation rather than the symmetry of the cube. This is what produces the lopsided, pointed blob after 3 rounds.
+		</p>
+		<p>
+		To fix it, I preprocessed the cube by splitting the diagonal of each of the 6 faces once. Each face then becomes 4 triangles that meet at a new vertex at the face's center. Now every face has the same connectivity: each corner has degree 6 (3 cube edges plus 3 edges to the centers of its faces), and each face center has degree 4. Because the mesh connectivity now has the cube's symmetry, Loop subdivision treats all corners and all faces the same way, and the result after 3 rounds is a symmetric, rounded shape.
+		</p>
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part6/sym_0.png" width="400px"/>
+				  <figcaption>Preprocessed cube: every face's diagonal is split, so each face is 4 triangles around its center</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part6/sym_3.png" width="400px"/>
+				  <figcaption>The preprocessed cube after 3 rounds: symmetric (compare with the asymmetric result above)</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
 		</div>
 	</body>
 </html>
